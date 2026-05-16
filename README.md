@@ -12,7 +12,33 @@ Built as a hands-on ML/AI learning project. Designed to be useful to the whole h
 |---|---|---|
 | Text summarization | `POST /summarize` | Summarize any text in three styles: concise, bullet points, or ELI5 |
 | PDF summarization | `POST /upload-pdf` | Upload a PDF, get back a summary — works with any language |
+| Project scaffolding | `POST /scaffold` | Describe a project in plain English, download a ready-to-use zip with real files |
 | Health check | `GET /health` | Service liveness check for monitoring and Docker |
+
+---
+
+## Demo — Scaffolding generator
+
+```bash
+curl -X POST http://localhost:9000/scaffold \
+  -H "Content-Type: application/json" \
+  -d '{"description": "A FastAPI backend with a /hello endpoint and Docker support", "project_type": "python-api"}' \
+  --output my-project.zip
+
+unzip my-project.zip
+```
+
+Generated output:
+```
+fastapi_hello/
+├── app.py            ← working FastAPI app with /hello endpoint
+├── Dockerfile        ← ready to build and run
+├── requirements.txt  ← pinned dependencies
+├── .gitignore
+└── README.md         ← install + run instructions
+```
+
+All files have real, working content — not placeholder comments.
 
 ---
 
@@ -36,8 +62,9 @@ Client (browser / curl / any device on LAN)
         │
         ▼
   FastAPI (port 9000)
-  ├── POST /summarize      ← routers/summarize.py
-  ├── POST /upload-pdf     ← routers/pdf.py
+  ├── POST /summarize          ← routers/summarize.py
+  ├── POST /upload-pdf         ← routers/pdf.py
+  ├── POST /scaffold           ← routers/scaffold.py
   └── GET  /health
         │
         ▼
@@ -50,7 +77,7 @@ Client (browser / curl / any device on LAN)
   LLaMA 3 8B — running locally on bare metal
 ```
 
-The API follows a **router / service separation**: routers handle HTTP concerns (validation, request/response), services handle business logic (LLM calls, PDF parsing). This keeps each layer independently testable.
+The API follows a **router / service separation**: routers handle HTTP concerns (validation, request/response), services handle business logic (LLM calls, PDF parsing, zip generation). Each layer is independently testable.
 
 ---
 
@@ -97,7 +124,7 @@ PORT=9000
 uvicorn backend.main:app --host 0.0.0.0 --port 9000
 ```
 
-API is now accessible at `http://YOUR_SERVER_IP:9000`
+API available at `http://YOUR_SERVER_IP:9000`
 
 Interactive docs (Swagger UI): `http://YOUR_SERVER_IP:9000/docs`
 
@@ -124,6 +151,17 @@ curl -X POST http://localhost:9000/upload-pdf \
 
 Works with any language — tested with French and English documents.
 
+### Generate a project scaffold
+
+```bash
+curl -X POST http://localhost:9000/scaffold \
+  -H "Content-Type: application/json" \
+  -d '{"description": "Your project idea here", "project_type": "python-api"}' \
+  --output project.zip
+```
+
+Supported project types: `python-api` · `node-backend` · `fullstack-react`
+
 ---
 
 ## Project structure
@@ -133,23 +171,15 @@ homelab-ai/
 ├── .env.example
 ├── requirements.txt
 └── backend/
-    ├── main.py               ← FastAPI app + router registration
+    ├── main.py                  ← FastAPI app + router registration
     ├── routers/
-    │   ├── summarize.py      ← POST /summarize
-    │   └── pdf.py            ← POST /upload-pdf
+    │   ├── summarize.py         ← POST /summarize
+    │   ├── pdf.py               ← POST /upload-pdf
+    │   └── scaffold.py          ← POST /scaffold
     └── services/
-        └── ollama_client.py  ← Ollama HTTP client
+        ├── ollama_client.py     ← Ollama HTTP client
+        └── scaffolder.py        ← JSON parsing, zip generation
 ```
-
----
-
-## Roadmap
-
-- [x] Phase 1 — Local LLM setup (Ollama + LLaMA 3) + Python client
-- [x] Phase 2 — FastAPI backend with text and PDF summarization
-- [ ] Phase 3 — Project scaffolding generator (natural language → boilerplate code + zip download)
-- [ ] Phase 4 — Docker Compose deployment + Nginx reverse proxy + web UI
-- [ ] Phase 5 — RAG pipeline (ChromaDB vector search over document collections), voice interface, fine-tuning experiments
 
 ---
 
@@ -158,10 +188,23 @@ homelab-ai/
 - **Local LLM inference** — running a quantized 8B parameter model on consumer hardware via Ollama
 - **REST API design** — FastAPI with Pydantic models for automatic validation and OpenAPI docs
 - **PDF processing** — text extraction from arbitrary PDFs using PyMuPDF
-- **Prompt engineering** — system prompts for consistent, structured model output
+- **Structured LLM output** — prompting for JSON, sanitizing LLM responses, parsing into real files
+- **LLM output sanitization** — character-level JSON cleaning to handle model formatting inconsistencies
+- **File generation** — building zip archives in memory with `zipfile` + `io.BytesIO`, no temp files
+- **Streaming file responses** — returning binary downloads from FastAPI via `StreamingResponse`
+- **Prompt engineering** — system prompts for consistent, structured model behaviour
 - **Separation of concerns** — router / service layering for maintainability
 - **Secure config** — environment variable management with dotenv, secrets never committed
-- **RAG foundations** — context window management and document chunking strategy
+
+---
+
+## Roadmap
+
+- [x] Phase 1 — Local LLM setup (Ollama + LLaMA 3) + Python client
+- [x] Phase 2 — FastAPI backend: text summarization + PDF upload
+- [x] Phase 3 — Project scaffolding generator (natural language → working code + zip download)
+- [ ] Phase 4 — Docker Compose deployment + Nginx reverse proxy + web UI
+- [ ] Phase 5 — RAG pipeline (ChromaDB), voice interface, fine-tuning experiments
 
 ---
 
