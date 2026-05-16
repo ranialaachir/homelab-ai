@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from backend.routers import summarize, pdf
+from backend.routers import summarize, pdf, scaffold
 
 app = FastAPI(
     title="Homelab AI Assistant",
@@ -9,6 +9,7 @@ app = FastAPI(
 
 app.include_router(summarize.router)
 app.include_router(pdf.router)
+app.include_router(scaffold.router)
 
 @app.get("/health")
 def health():
