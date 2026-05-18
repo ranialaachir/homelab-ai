@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Homelab AI Assistant</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+      color: #f8fafc;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-bottom: 2.5rem;
+    }
+
+    .card {
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 680px;
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+    }
+
+    textarea, select, input[type="text"] {
+      width: 100%;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      color: #e2e8f0;
+      padding: 0.75rem;
+      font-size: 0.95rem;
+      font-family: inherit;
+      margin-bottom: 0.75rem;
+      resize: vertical;
+    }
+
+    textarea:focus, select:focus, input:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+
+    select { cursor: pointer; }
+
+    button {
+      background: #6366f1;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.6rem 1.4rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button:hover { background: #4f46e5; }
+    button:disabled { background: #374151; cursor: not-allowed; }
+
+    .result {
+      margin-top: 1rem;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 1rem;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      display: none;
+    }
+
+    .result.visible { display: block; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid #ffffff44;
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .download-link {
+      display: inline-block;
+      margin-top: 0.75rem;
+      color: #6366f1;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+
+    .download-link:hover { text-decoration: underline; }
+
+    .row { display: flex; gap: 0.75rem; align-items: flex-start; }
+    .row select { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+
+  <h1>🧠 Homelab AI</h1>
+  <p class="subtitle">Running locally on your server · Powered by LLaMA 3</p>
+
+  <!-- Summarize text -->
+  <div class="card">
+    <h2>Summarize Text</h2>
+    <textarea id="summarize-text" rows="5" placeholder="Paste any text here..."></textarea>
+    <div class="row">
+      <select id="summarize-style">
+        <option value="concise">Concise</option>
+        <option value="bullet_points">Bullet points</option>
+        <option value="eli5">ELI5</option>
+      </select>
+      <button onclick="summarizeText()" id="summarize-btn">Summarize</button>
+    </div>
+    <div class="result" id="summarize-result"></div>
+  </div>
+
+  <!-- Summarize PDF -->
+  <div class="card">
+    <h2>Summarize PDF</h2>
+    <input type="file" id="pdf-file" accept=".pdf"
+      style="background:none; border:none; padding:0; margin-bottom:0.75rem; color:#94a3b8;" />
+    <br/>
+    <button onclick="uploadPDF()" id="pdf-btn">Upload & Summarize</button>
+    <div class="result" id="pdf-result"></div>
+  </div>
+
+  <!-- Scaffold generator -->
+  <div class="card">
+    <h2>Generate Project Scaffold</h2>
+    <textarea id="scaffold-desc" rows="3"
+      placeholder="Describe your project... e.g. 'A FastAPI backend with PostgreSQL and Docker support'"></textarea>
+    <div class="row">
+      <select id="scaffold-type">
+        <option value="python-api">Python API</option>
+        <option value="node-backend">Node.js Backend</option>
+        <option value="fullstack-react">Fullstack React</option>
+      </select>
+      <button onclick="generateScaffold()" id="scaffold-btn">Generate</button>
+    </div>
+    <div class="result" id="scaffold-result"></div>
+  </div>
+
+  <script>
+    // Helper: set a button to loading state and back
+    function setLoading(btnId, loading) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = loading;
+      btn.innerHTML = loading
+        ? '<span class="spinner"></span>Thinking...'
+        : btn.dataset.label;
+    }
+
+    // Save original button labels on page load
+    document.querySelectorAll('button').forEach(btn => {
+      btn.dataset.label = btn.textContent;
+    });
+
+    // Helper: show result box
+    function showResult(id, content) {
+      const el = document.getElementById(id);
+      el.textContent = content;
+      el.classList.add('visible');
+    }
+
+    async function summarizeText() {
+      const text = document.getElementById('summarize-text').value.trim();
+      const style = document.getElementById('summarize-style').value;
+      if (!text) return alert('Please enter some text first.');
+
+      setLoading('summarize-btn', true);
+      try {
+        const res = await fetch('/summarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, style })
+        });
+        if (!res.ok) {
+             const err = await res.text();
+             throw new Error(`Server error ${res.status}: ${err}`);
+        }
+        const data = await res.json();
+        showResult('summarize-result', data.summary || data.detail);
+      } catch (e) {
+        showResult('summarize-result', 'Error: ' + e.message);
+      } finally {
+        setLoading('summarize-btn', false);
+      }
+    }
+
+    async function uploadPDF() {
+      const file = document.getElementById('pdf-file').files[0];
+      if (!file) return alert('Please select a PDF file first.');
+
+      setLoading('pdf-btn', true);
+      const form = new FormData();
+      form.append('file', file);
+
+      try {
+        const res = await fetch('/upload-pdf', { method: 'POST', body: form });
+        if (!res.ok) {
+             const err = await res.text();
+             throw new Error(`Server error ${res.status}: ${err}`);
+        }
+        const data = await res.json();
+        const text = data.summary 
+            ? `📄 ${data.filename} (${data.char_count} chars)\n\n${data.summary}` 
+            : data.detail || 'No summary returned';
+        showResult('pdf-result', text);
+      } catch (e) {
+        showResult('pdf-result', 'Error: ' + e.message);
+      } finally {
+        setLoading('pdf-btn', false);
+      }
+    }
+
+    async function generateScaffold() {
+      const description = document.getElementById('scaffold-desc').value.trim();
+      const project_type = document.getElementById('scaffold-type').value;
+      if (!description) return alert('Please describe your project first.');
+
+      setLoading('scaffold-btn', true);
+      // Clear previous download link if any
+      const resultEl = document.getElementById('scaffold-result');
+      resultEl.innerHTML = '';
+      resultEl.classList.remove('visible');
+
+      try {
+        const res = await fetch('/scaffold', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description, project_type })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          showResult('scaffold-result', 'Error: ' + err.detail);
+          return;
+        }
+
+        // Response is a zip file — create a download link from the blob
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+
+        // Get filename from Content-Disposition header
+        const disposition = res.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename=(.+)/);
+        const filename = match ? match[1] : 'project.zip';
+
+        resultEl.classList.add('visible');
+        resultEl.innerHTML = `✅ Project generated!<br>
+          <a class="download-link" href="${url}" download="${filename}">
+            ⬇️ Download ${filename}
+          </a>`;
+      } catch (e) {
+        showResult('scaffold-result', 'Error: ' + e.message);
+      } finally {
+        setLoading('scaffold-btn', false);
+      }
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,25 @@
+services:
+
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    volumes:
+      - ~/.ollama:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: homelab-ai-backend
+    ports:
+      - "9000:8000"    # host port 9000 → container port 8000
+    environment:
+      - OLLAMA_URL=http://ollama:11434/api/generate
+      - OLLAMA_MODEL=llama3
+      - OLLAMA_NOPRUNE=true
+    depends_on:
+      - ollama
+    restart: unless-stopped
