@@ -1,8 +1,8 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel
-import fitz
 from backend.services.pdf_store import upload as store_pdf
-from backend.services.summarizer import summarize   # ← replaces direct ask() call
+from backend.services.summarizer import summarize
+from backend.services.ocr import extract_text   # ← replaces the old fitz-only function
 
 router = APIRouter()
 
@@ -11,14 +11,6 @@ class PDFSummaryResponse(BaseModel):
     filename: str
     char_count: int
     summary: str
-
-
-def extract_text_from_pdf(file_bytes: bytes) -> str:
-    pdf = fitz.open(stream=file_bytes, filetype="pdf")
-    text = ""
-    for page in pdf:
-        text += page.get_text()
-    return text.strip()
 
 
 @router.post("/upload-pdf", response_model=PDFSummaryResponse)
@@ -34,14 +26,13 @@ async def upload_pdf(
     pdf_id = store_pdf(file_bytes, file.filename, session_id, keep)
 
     try:
-        text = extract_text_from_pdf(file_bytes)
+        text = extract_text(file_bytes)   # ← now handles both text and scanned PDFs
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Could not read PDF: {str(e)}")
 
     if not text:
-        raise HTTPException(status_code=422, detail="PDF appears to be empty or scanned.")
+        raise HTTPException(status_code=422, detail="PDF appears to be empty.")
 
-    # No more [:3000] — summarize() handles any length automatically
     summary = summarize(text)
 
     return PDFSummaryResponse(
