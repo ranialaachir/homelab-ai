@@ -21,4 +21,4 @@ def ask(prompt: str, system: str=None) -> str:
         payload["system"] = system
         response = requests.post(OLLAMA_URL, json=payload)
         response.raise_for_status()
-    return response.json()["response"]
+        return response.json()["response"]
