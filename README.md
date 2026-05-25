@@ -217,3 +217,15 @@ The goal is to keep extending it through the roadmap: containerization, a proper
 ---
 
 *Built with Python · FastAPI · Ollama · LLaMA 3 · Running on a homelab*
+```
+cd ~/homelab-ai
+source venv/bin/activate
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 9000
+```
+```
+cd ~/homelab-ai
+docker compose up --build -d
+```
+```
+sqlite3 ~/homelab-ai/data/pdf_store.db "SELECT * FROM pdfs;"
+```
