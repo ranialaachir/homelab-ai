@@ -9,19 +9,45 @@ services:
       - "11434:11434"
     restart: unless-stopped
 
+  chromadb:
+    # ChromaDB is the vector database. It stores our chunk embeddings
+    # and handles similarity search. We run it as a sidecar container —
+    # the backend talks to it over the Docker network on port 8000.
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    ports:
+      - "8001:8000"    # expose 8001 on the host for debugging (optional)
+    volumes:
+      # Persist vector data across container restarts.
+      # Without this, every restart would wipe all indexed PDFs.
+      - chroma_data:/chroma/chroma
+    restart: unless-stopped
+
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
     container_name: homelab-ai-backend
     ports:
-      - "9000:8000"    # host port 9000 → container port 8000
+      - "9000:8000"
     environment:
       - OLLAMA_URL=http://ollama:11434/api/generate
       - OLLAMA_MODEL=llama3
       - OLLAMA_NOPRUNE=true
+      # Tell the backend where ChromaDB lives.
+      # "chromadb" is the service name above — Docker resolves it automatically
+      # to the container's internal IP. Port 8000 is ChromaDB's internal port.
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
     depends_on:
       - ollama
+      - chromadb    # backend waits for chromadb to start first
     restart: unless-stopped
     volumes:
-      - ./data:/app/data 
+      - ./data:/app/data
+
+# Named volume — Docker manages this on the host.
+# Data survives container restarts and `docker compose down`.
+# Only destroyed with `docker compose down -v` (the -v flag).
+volumes:
+  chroma_data:
